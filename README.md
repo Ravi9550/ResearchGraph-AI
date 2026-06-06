@@ -19,85 +19,58 @@ ResearchGraph AI is a multi-agent research assistant that turns a topic into a c
 
 ## Architecture
 
-```text
-User
-  |
-  v
-Streamlit UI
-  - login/register
-  - topic input
-  - source count and revision settings
-  |
-  v
-Research Pipeline
-  |
-  +--> Memory Reader
-  |      |
-  |      v
-  |    SQLite memory lookup
-  |    returns related previous research context
-  |
-  +--> Planner Agent
-  |      |
-  |      v
-  |    LLM creates research objective, questions, and search queries
-  |
-  +--> Search Layer
-  |      |
-  |      v
-  |    Search API / DuckDuckGo fallback
-  |      |
-  |      v
-  |    Internet sources returned as title, URL, snippet, domain
-  |
-  +--> Source Reader
-  |      |
-  |      v
-  |    Scrapes source pages
-  |      |
-  |      v
-  |    Falls back to search snippet if scraping fails
-  |
-  +--> Evidence Agent
-  |      |
-  |      v
-  |    LLM extracts summaries, key facts, dates, numbers, and limitations
-  |
-  +--> Writer Agent
-  |      |
-  |      v
-  |    LLM writes a citation-backed Markdown report
-  |
-  +--> Verifier Agent
-  |      |
-  |      v
-  |    LLM checks unsupported claims, citation problems, contradictions, and freshness risks
-  |
-  +--> Revision Agent
-  |      |
-  |      v
-  |    LLM revises weak reports when verification fails or score is low
-  |
-  +--> Quality Scorer
-         |
-         v
-       Deterministic scoring for citations, validity, diversity, freshness, depth, and readability
-         |
-         v
-SQLite Storage
-  - users
-  - research history
-  - saved reports
-  - memory snippets
-  - search cache
-  |
-  v
-Result UI
-  - report
-  - evidence
-  - verifier result
-  - quality score
-  - PDF / JSON export
+```mermaid
+flowchart TD
+    user[User] --> ui[Streamlit UI]
+
+    ui --> auth[Login / Register]
+    ui --> input[Research Topic + Settings]
+    input --> pipeline[Research Pipeline]
+
+    pipeline --> memory[Memory Reader]
+    memory --> sqlite[(SQLite Storage)]
+    sqlite --> memory_context[Previous Research Context]
+    memory_context --> planner[Planner Agent]
+
+    pipeline --> planner
+    planner --> llm_plan[LLM: Research Objective, Questions, Search Queries]
+    llm_plan --> search[Search Layer]
+
+    search --> providers[Search APIs<br/>Tavily / SerpAPI / Brave / Bing / DuckDuckGo]
+    providers --> sources[Normalized Source Results<br/>Title, URL, Snippet, Domain]
+
+    sources --> reader[Source Reader / Scraper]
+    reader --> page_content[Page Content]
+    reader --> snippet_fallback[Snippet Fallback<br/>when scraping fails]
+
+    page_content --> evidence[Evidence Agent]
+    snippet_fallback --> evidence
+    evidence --> llm_evidence[LLM: Summaries, Facts, Dates, Numbers, Limitations]
+
+    llm_evidence --> writer[Writer Agent]
+    writer --> report[LLM: Citation-Backed Report]
+
+    report --> verifier[Verifier Agent]
+    verifier --> verdict[LLM: Unsupported Claims, Citation Issues, Contradictions, Freshness Risks]
+
+    verdict --> decision{Needs Revision?}
+    decision -- Yes --> revision[Revision Agent]
+    revision --> revised_report[LLM: Revised Report]
+    revised_report --> verifier
+
+    decision -- No --> scoring[Quality Scorer]
+    scoring --> scores[Deterministic Scores<br/>Citation Coverage, Validity, Diversity, Freshness, Depth, Readability]
+
+    scores --> save[Save Run]
+    save --> sqlite
+
+    save --> result[Result UI]
+    result --> report_view[Report]
+    result --> evidence_view[Evidence]
+    result --> verifier_view[Verifier Result]
+    result --> export[PDF / JSON Export]
+
+    auth --> sqlite
 ```
 
 The system is organized around a single research pipeline. The UI collects the topic and configuration, then the pipeline coordinates memory lookup, planning, web search, source reading, evidence extraction, writing, verification, scoring, and persistence.
