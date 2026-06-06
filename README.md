@@ -1,100 +1,128 @@
-# ResearchGraph AI V2
+# ResearchGraph AI
 
-A resume-ready multi-agent research intelligence system.
+ResearchGraph AI is a multi-agent research assistant that turns a topic into a cited research report. It plans the research, searches public sources, extracts evidence, writes a structured report, verifies claims, scores quality, and saves the result to user history.
 
-It takes a topic, plans research, searches public sources, extracts evidence, writes a citation-backed report, verifies the report for unsupported claims, revises weak reports, scores quality, stores research history, and reuses previous research memory.
+The app is built for a simple live deployment with Streamlit, SQLite, and provider-based LLM/search configuration through environment variables.
 
-## Why this is stronger than a tutorial project
+## Features
 
-Most tutorials stop at: search web -> scrape -> write report.
-
-ResearchGraph AI V2 adds:
-
-- Planner Agent
-- Provider-agnostic Search/Scrape Tool with retry and fallback
-- Evidence Extractor Agent
-- Citation-aware Writer Agent
-- Verifier Agent
-- Revision Agent
-- LangGraph-ready conditional workflow
-- SQLite history
+- User login and registration
+- Recent research history per user
+- Live agent status while a research run is executing
+- Web search with multiple provider options
+- Source scraping with snippet fallback
+- Evidence extraction from each source
+- Citation-backed report writing
+- Verifier pass for unsupported claims, citation issues, contradictions, and freshness risks
+- Optional automatic revision when quality is weak
+- Deterministic quality scoring
 - SQLite-backed research memory
-- Citation coverage scoring
-- Citation validity scoring
-- Source diversity scoring
-- Freshness scoring
-- Readability scoring
-- Unsupported-claim penalty
-- Markdown / JSON / PDF export
-- Streamlit production-friendly dashboard
-- FastAPI backend
+- PDF and JSON export
+- Optional FastAPI backend
 
-## Architecture
+## How It Works
 
 ```text
-User Topic
-   ↓
-Planner Agent
-   ↓
-Memory Retrieval
-   ↓
-Search + Scrape Tool
-   ↓
-Evidence Extractor Agent
-   ↓
-Citation-aware Writer Agent
-   ↓
-Verifier Agent
-   ↓
-Conditional Revision if score is weak
-   ↓
-Quality Scoring + History + Memory Save
+User topic
+  -> Planner Agent
+  -> Memory Reader
+  -> Search and Source Reader
+  -> Evidence Reader
+  -> Writer Agent
+  -> Verifier Agent
+  -> Revision Agent, when needed
+  -> Quality Scoring
+  -> Save to History and Memory
 ```
 
-When LangGraph is installed, the project uses a graph workflow with a conditional edge from verifier to revision. If LangGraph fails in a simple deployment environment, the project automatically falls back to a sequential pipeline so your demo does not break.
+The Streamlit interface uses the sequential pipeline by default for easier deployment and debugging. The codebase also contains a LangGraph workflow implementation, but the deployed app does not depend on it being enabled.
 
-## Frontend choice
+## Tech Stack
 
-This project uses **Streamlit** as the main frontend because it is easiest to deploy live and still gives a strong portfolio demo. For your resume, the backend and architecture matter more than using React. FastAPI is included separately for production-style API demos.
+- Python
+- Streamlit
+- FastAPI
+- SQLite
+- LangChain
+- LangGraph-compatible workflow
+- ReportLab for PDF export
+- Provider adapters for Gemini, OpenAI, Anthropic, Groq, OpenRouter, Together, Ollama, and custom OpenAI-compatible APIs
 
-## Setup
+## Project Structure
+
+```text
+app.py              Streamlit UI
+api.py              Optional FastAPI endpoints
+pipeline.py         Main research orchestration
+graph_workflow.py   LangGraph-compatible workflow
+agents.py           Planner, evidence, writer, verifier, revision agents
+search_factory.py   Search provider routing
+tools.py            Search, scraping, cache, and source utilities
+memory.py           SQLite-backed research memory
+storage.py          Users, history, jobs, and memory persistence
+scoring.py          Deterministic report quality scoring
+exporters.py        PDF and JSON export helpers
+llm_factory.py      LLM provider selection
+config.py           Environment-based configuration
+```
+
+## Local Setup
+
+Create and activate a virtual environment:
 
 ```bash
 python -m venv venv
+```
 
-# Windows
+Windows:
+
+```bash
 venv\Scripts\activate
+```
 
-# macOS/Linux
+macOS/Linux:
+
+```bash
 source venv/bin/activate
+```
 
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-Create a local `.env` file. Do not commit it to GitHub.
+Create a local `.env` file. Do not commit this file to GitHub.
 
 ```env
-LLM_PROVIDER=gemini
-GOOGLE_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_groq_key
+GROQ_MODEL=llama-3.1-8b-instant
+
 SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
-API_AUTH_TOKEN=choose_a_long_random_token_for_fastapi
+TAVILY_API_KEY=your_tavily_key
+
+DEFAULT_MAX_SOURCES=6
+MAX_REVISIONS=1
 ```
 
-## Run Streamlit UI
+Run the Streamlit app:
 
 ```bash
 streamlit run app.py
 ```
 
-Open the URL shown in terminal, usually:
+Open the local URL shown in the terminal, usually:
 
 ```text
 http://localhost:8501
 ```
 
-## Run FastAPI backend
+## FastAPI Backend
+
+The Streamlit app is the main interface. FastAPI is included for API access and integration experiments.
+
+Run it with:
 
 ```bash
 uvicorn api:app --reload
@@ -106,154 +134,83 @@ Open:
 http://127.0.0.1:8000/docs
 ```
 
-## Offline smoke test
-
-```bash
-python tests_dummy.py
-```
-
-This does not call any paid LLM provider or external search API.
-
-## Resume bullets
-
-**ResearchGraph AI V2 — Multi-Agent Research Intelligence System**  
-`LangGraph, LangChain, FastAPI, Streamlit, SQLite, Gemini/OpenAI/Claude/Groq/Ollama/OpenRouter, Tavily/SerpAPI/Brave/Serper/Bing/DuckDuckGo`
-
-- Built a multi-agent research platform that plans research tasks, searches public sources, extracts evidence, writes citation-backed reports, verifies claims, and revises weak outputs automatically.
-- Implemented a LangGraph-ready workflow with planner, evidence extractor, writer, verifier, and revision agents, including conditional routing from verification failure back to report revision.
-- Designed a quality evaluation engine to score citation coverage, citation validity, source diversity, evidence depth, freshness, readability, and unsupported-claim penalties.
-- Added reusable research memory using SQLite for simple production deployment.
-- Built a Streamlit dashboard to inspect report output, source evidence, verifier feedback, evaluation scores, memory matches, live agent status, and exports.
-- Exposed the pipeline through FastAPI with synchronous and async-style thread-backed job endpoints.
-
-## What to explain in interviews
-
-### How do you prevent hallucination?
-
-The writer is restricted to the extracted evidence pack, every factual claim must cite a source ID, and the verifier flags unsupported claims before saving.
-
-### How do you verify sources?
-
-The verifier checks citation issues, source quality, contradictions, freshness risks, and unsupported claims. Deterministic scoring also checks whether citations are valid source IDs.
-
-### How do agents share state?
-
-The pipeline passes a shared state dictionary containing topic, plan, sources, evidence, report, verifier output, scores, trace, and memory context. In LangGraph mode this state moves between graph nodes.
-
-### Why multiple agents?
-
-The tasks have different objectives: planning, evidence extraction, writing, and verification. Splitting them makes prompts simpler, outputs more inspectable, and failures easier to debug.
-
-### What happens if scraping fails?
-
-Each URL scrape has retry logic. If scraping fails, the pipeline falls back to the search snippet instead of failing the whole run.
-
-### How do you evaluate report quality?
-
-The system computes citation coverage, citation validity, source diversity, evidence depth, freshness, readability, and verifier penalties.
-
-
-## Switching LLM providers from `.env` only
-
-This V2 build is provider-agnostic. You do **not** edit Python files to change models. Change only `LLM_PROVIDER`, `LLM_MODEL`, and the matching API key in `.env`.
-
-Supported values:
+For public API deployment, set:
 
 ```env
-LLM_PROVIDER=gemini      # Google Gemini
-LLM_PROVIDER=openai      # OpenAI
-LLM_PROVIDER=anthropic   # Claude
-LLM_PROVIDER=groq        # Groq-hosted open models
-LLM_PROVIDER=openrouter  # Many models via OpenRouter
-LLM_PROVIDER=together    # Together AI
-LLM_PROVIDER=ollama      # Local Ollama model
-LLM_PROVIDER=custom      # Any OpenAI-compatible provider
+API_AUTH_TOKEN=your_long_random_token
 ```
 
-### Example: Gemini
+Protected API routes accept either:
+
+```text
+Authorization: Bearer your_long_random_token
+```
+
+or:
+
+```text
+X-API-Key: your_long_random_token
+```
+
+## LLM Configuration
+
+All model switching is controlled through environment variables. The app reads `LLM_PROVIDER` and routes model creation through `llm_factory.py`.
+
+Supported providers:
 
 ```env
 LLM_PROVIDER=gemini
-GOOGLE_API_KEY=your_gemini_api_key
-LLM_MODEL=gemini-2.5-flash
-SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
-```
-
-### Example: OpenAI
-
-```env
 LLM_PROVIDER=openai
-OPENAI_API_KEY=your_openai_api_key
-LLM_MODEL=gpt-4o-mini
-SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
-```
-
-### Example: Claude / Anthropic
-
-```env
 LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=your_anthropic_api_key
-LLM_MODEL=claude-3-5-haiku-latest
-SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
-```
-
-### Example: Groq
-
-```env
 LLM_PROVIDER=groq
-GROQ_API_KEY=your_groq_api_key
-LLM_MODEL=llama-3.1-8b-instant
-SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
+LLM_PROVIDER=openrouter
+LLM_PROVIDER=together
+LLM_PROVIDER=ollama
+LLM_PROVIDER=custom
 ```
 
-### Example: OpenRouter
+Examples:
 
 ```env
+# Groq
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_groq_key
+LLM_MODEL=llama-3.1-8b-instant
+```
+
+```env
+# OpenRouter
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=your_openrouter_key
 LLM_MODEL=openai/gpt-4o-mini
-SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
 ```
 
-### Example: Local Ollama
-
 ```env
-LLM_PROVIDER=ollama
-LLM_MODEL=llama3.1
-OLLAMA_BASE_URL=http://localhost:11434
-SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
+# Gemini
+LLM_PROVIDER=gemini
+GOOGLE_API_KEY=your_gemini_key
+LLM_MODEL=gemini-2.0-flash
 ```
 
-### Example: any OpenAI-compatible provider
-
 ```env
+# Custom OpenAI-compatible provider
 LLM_PROVIDER=custom
 LLM_BASE_URL=https://api.provider.com/v1
 LLM_API_KEY=your_provider_key
 LLM_MODEL=provider-model-name
-SEARCH_PROVIDER=auto
-TAVILY_API_KEY=your_tavily_key   # optional; SerpAPI/Brave/Serper/Bing also supported
 ```
 
-All provider logic is centralized in `llm_factory.py`. Agents call only `get_llm()`, so future providers can be added in one file.
+If `LLM_MODEL` is blank, the provider-specific default from `config.py` is used.
 
-## Switching search providers from `.env` only
+## Search Configuration
 
-Tavily is no longer mandatory. Search logic is centralized in `search_factory.py`, and the rest of the pipeline calls only `search_web()`.
-
-Default mode:
+Search provider selection is controlled by `SEARCH_PROVIDER`.
 
 ```env
 SEARCH_PROVIDER=auto
 ```
 
-`auto` picks the first available provider in this order:
+`auto` picks the first configured provider in this order:
 
 ```text
 Tavily -> SerpAPI -> Brave -> Serper -> Bing -> DuckDuckGo fallback
@@ -262,40 +219,90 @@ Tavily -> SerpAPI -> Brave -> Serper -> Bing -> DuckDuckGo fallback
 Examples:
 
 ```env
-# Tavily
 SEARCH_PROVIDER=tavily
 TAVILY_API_KEY=your_tavily_key
-
-# SerpAPI
-SEARCH_PROVIDER=serpapi
-SERPAPI_API_KEY=your_serpapi_key
-
-# Brave Search API
-SEARCH_PROVIDER=brave
-BRAVE_SEARCH_API_KEY=your_brave_key
-
-# Serper
-SEARCH_PROVIDER=serper
-SERPER_API_KEY=your_serper_key
-
-# Bing Web Search
-SEARCH_PROVIDER=bing
-BING_SEARCH_API_KEY=your_bing_key
-
-# No-key demo fallback. Less reliable than paid/official APIs.
-SEARCH_PROVIDER=duckduckgo
-ALLOW_DUCKDUCKGO_FALLBACK=true
-
-# Disable web search
-SEARCH_PROVIDER=none
 ```
-
-For custom search APIs, set:
 
 ```env
-SEARCH_PROVIDER=custom
-SEARCH_API_URL=https://your-search-api.example.com/search
-SEARCH_API_KEY=your_optional_key
+SEARCH_PROVIDER=serpapi
+SERPAPI_API_KEY=your_serpapi_key
 ```
 
-The custom endpoint should return JSON with `results`, `organic`, or `items` where each item has fields like `title`, `url`/`link`, and `snippet`/`description`.
+```env
+SEARCH_PROVIDER=brave
+BRAVE_SEARCH_API_KEY=your_brave_key
+```
+
+```env
+SEARCH_PROVIDER=duckduckgo
+ALLOW_DUCKDUCKGO_FALLBACK=true
+```
+
+DuckDuckGo is useful for quick testing, but a dedicated search API is more reliable for live demos.
+
+## Deployment
+
+The simplest deployment target is Streamlit Community Cloud.
+
+1. Push the repository to GitHub.
+2. Create a new Streamlit app.
+3. Select the repository and branch.
+4. Set the main file path to:
+
+```text
+app.py
+```
+
+5. Add secrets in Streamlit's TOML secrets editor:
+
+```toml
+LLM_PROVIDER = "groq"
+GROQ_API_KEY = "your_groq_key"
+GROQ_MODEL = "llama-3.1-8b-instant"
+
+SEARCH_PROVIDER = "auto"
+TAVILY_API_KEY = "your_tavily_key"
+
+DEFAULT_MAX_SOURCES = "6"
+MAX_REVISIONS = "1"
+```
+
+Do not upload `.env`, local databases, logs, exports, or virtual environments.
+
+## Data Storage
+
+The app uses SQLite for:
+
+- Users
+- Research history
+- Saved run payloads
+- Memory snippets
+- Search cache
+
+This keeps local setup simple. On platforms with ephemeral storage, such as some free hosting environments, user accounts and history may reset after redeploys or restarts. For long-term production use, move storage to a managed database such as Postgres or Supabase.
+
+## Limitations
+
+- Generated reports depend on the quality of retrieved sources and model output.
+- The verifier reduces unsupported claims but cannot guarantee perfect factual accuracy.
+- Some websites block scraping; the pipeline falls back to search snippets when needed.
+- Free or low-cost LLM/search providers may rate-limit requests.
+- SQLite is not ideal for large multi-user production deployments.
+- Local Streamlit deployments are not a replacement for a full production auth and database stack.
+
+## Development Check
+
+Run the offline smoke test:
+
+```bash
+python tests_dummy.py
+```
+
+This test does not call external LLM or search APIs.
+
+## Security Notes
+
+- Never commit `.env`.
+- Rotate API keys if they were exposed in logs, screenshots, commits, or chat.
+- Use Streamlit Secrets or hosting environment variables for live deployment.
+- Set `API_AUTH_TOKEN` before exposing the FastAPI backend publicly.
